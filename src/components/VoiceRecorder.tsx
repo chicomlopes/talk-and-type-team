@@ -255,13 +255,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = () => {
 
       {/* Recording Controls */}
       <Card className="shadow-card">
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2">
-            {isRecording ? <MicOff className="text-recording" /> : <Mic />}
-            Recording Controls
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 pt-6">
           <div className="flex flex-col items-center space-y-4">
             {/* Recording Timer */}
             {(isRecording || recordingTime > 0) && (
