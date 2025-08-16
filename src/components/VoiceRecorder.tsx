@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Mic, MicOff, Play, Pause, Copy, Trash2, Download } from 'lucide-react';
+import { Mic, MicOff, Play, Pause, Copy, Trash2, Download, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface VoiceRecorderProps {}
@@ -20,6 +20,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = () => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   
   const { toast } = useToast();
 
@@ -206,6 +207,35 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = () => {
     }
   };
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Check if it's an audio file
+      if (!file.type.startsWith('audio/')) {
+        toast({
+          title: "Invalid File",
+          description: "Please select an audio file.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const url = URL.createObjectURL(file);
+      setAudioURL(url);
+      setTranscript('');
+      setRecordingTime(0);
+      
+      toast({
+        title: "File Uploaded",
+        description: `${file.name} ready for playback. Note: Live transcription works best with recordings.`,
+      });
+    }
+  };
+
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -216,10 +246,10 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = () => {
     <div className="max-w-2xl mx-auto p-6 space-y-6">
       <div className="text-center space-y-4">
         <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-          Voice Transcription
+          Made for Teams: Speech to Text Tool
         </h1>
         <p className="text-muted-foreground">
-          Record your voice message and get an instant text transcript
+          Record your voice or upload audio files to get instant text transcripts
         </p>
       </div>
 
@@ -245,25 +275,48 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = () => {
               </div>
             )}
 
-            {/* Recording Button */}
-            <Button
-              onClick={isRecording ? stopRecording : startRecording}
-              variant={isRecording ? "recording" : "hero"}
-              size="lg"
-              className="w-32 h-32 rounded-full text-lg font-semibold"
-            >
-              {isRecording ? (
-                <>
-                  <MicOff className="w-8 h-8" />
-                  Stop
-                </>
-              ) : (
-                <>
-                  <Mic className="w-8 h-8" />
-                  Record
-                </>
-              )}
-            </Button>
+            {/* Recording and Upload Buttons */}
+            <div className="flex flex-col items-center space-y-4">
+              <Button
+                onClick={isRecording ? stopRecording : startRecording}
+                variant={isRecording ? "recording" : "hero"}
+                size="lg"
+                className="w-32 h-32 rounded-full text-lg font-semibold"
+              >
+                {isRecording ? (
+                  <>
+                    <MicOff className="w-8 h-8" />
+                    Stop
+                  </>
+                ) : (
+                  <>
+                    <Mic className="w-8 h-8" />
+                    Record
+                  </>
+                )}
+              </Button>
+              
+              <div className="text-sm text-muted-foreground">or</div>
+              
+              <Button
+                onClick={triggerFileUpload}
+                variant="outline"
+                size="lg"
+                className="w-40"
+                disabled={isRecording}
+              >
+                <Upload className="w-5 h-5" />
+                Upload Audio
+              </Button>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*"
+                onChange={handleFileUpload}
+                style={{ display: 'none' }}
+              />
+            </div>
 
             {/* Transcription Status */}
             {isTranscribing && (
