@@ -9,7 +9,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-soft",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
@@ -18,6 +18,9 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        recording: "bg-recording text-recording-foreground hover:bg-recording/90 shadow-recording animate-pulse-recording",
+        success: "bg-success text-success-foreground hover:bg-success/90 shadow-soft",
+        hero: "gradient-hero text-white border-0 hover:opacity-90 shadow-soft transition-all duration-300",
       },
       size: {
         default: "h-10 px-4 py-2",
