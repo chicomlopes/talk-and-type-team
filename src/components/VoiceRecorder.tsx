@@ -327,15 +327,6 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = () => {
         </Card>
       )}
 
-      {/* Browser Compatibility Note */}
-      <Card className="border-warning/20 bg-warning/5">
-        <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground text-center">
-            <strong>Note:</strong> This app uses browser-based speech recognition. 
-            For best results, use Chrome or Edge and ensure you have a good internet connection.
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 };
