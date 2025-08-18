@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Mic, MicOff, Play, Pause, Copy, Trash2, Download, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface VoiceRecorderProps {}
 
@@ -17,7 +18,6 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = () => {
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -25,48 +25,12 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if browser supports speech recognition
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = 'en-US';
-      
-      recognitionRef.current.onresult = (event) => {
-        let finalTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          }
-        }
-        if (finalTranscript) {
-          setTranscript(prev => prev + finalTranscript + ' ');
-        }
-      };
-
-      recognitionRef.current.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        toast({
-          title: "Recognition Error",
-          description: "Could not process speech. Please try again.",
-          variant: "destructive",
-        });
-      };
-    } else {
-      toast({
-        title: "Not Supported",
-        description: "Speech recognition is not supported in this browser.",
-        variant: "destructive",
-      });
-    }
-
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [toast]);
+  }, []);
 
   const startRecording = async () => {
     try {
@@ -81,13 +45,16 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = () => {
         }
       };
       
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/wav' });
+      mediaRecorderRef.current.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         const url = URL.createObjectURL(blob);
         setAudioURL(url);
         
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
+        
+        // Transcribe audio using OpenAI Whisper
+        await transcribeAudio(blob);
       };
       
       mediaRecorderRef.current.start();
@@ -98,12 +65,6 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = () => {
       intervalRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
-      
-      // Start speech recognition
-      if (recognitionRef.current) {
-        setIsTranscribing(true);
-        recognitionRef.current.start();
-      }
       
       toast({
         title: "Recording Started",
@@ -124,19 +85,15 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      setIsTranscribing(false);
+      setIsTranscribing(true);
       
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
       
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-      
       toast({
         title: "Recording Stopped",
-        description: `Recording completed (${formatTime(recordingTime)})`,
+        description: `Processing transcription...`,
       });
     }
   };
@@ -207,7 +164,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = () => {
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       // Check if it's an audio file
@@ -227,13 +184,68 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = () => {
       
       toast({
         title: "File Uploaded",
-        description: `${file.name} ready for playback. Note: Live transcription works best with recordings.`,
+        description: `${file.name} uploaded. Transcribing...`,
       });
+
+      // Transcribe uploaded file
+      await transcribeAudio(file);
     }
   };
 
   const triggerFileUpload = () => {
     fileInputRef.current?.click();
+  };
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    try {
+      setIsTranscribing(true);
+      
+      // Convert blob to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      
+      reader.onloadend = async () => {
+        const base64Audio = reader.result as string;
+        const base64Data = base64Audio.split(',')[1]; // Remove data:audio/webm;base64, prefix
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+            body: { audio: base64Data }
+          });
+
+          if (error) {
+            throw error;
+          }
+
+          if (data?.text) {
+            setTranscript(data.text);
+            toast({
+              title: "Transcription Complete",
+              description: "Audio has been successfully transcribed.",
+            });
+          } else {
+            throw new Error('No transcript received');
+          }
+        } catch (error) {
+          console.error('Transcription error:', error);
+          toast({
+            title: "Transcription Failed",
+            description: "Could not transcribe audio. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+    } catch (error) {
+      console.error('Audio processing error:', error);
+      toast({
+        title: "Processing Error",
+        description: "Could not process audio file.",
+        variant: "destructive",
+      });
+      setIsTranscribing(false);
+    }
   };
 
   const formatTime = (seconds: number) => {
