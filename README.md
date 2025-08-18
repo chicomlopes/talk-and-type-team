@@ -1,4 +1,4 @@
-# Welcome to your Lovable project
+# Welcome to Made for Teams: Speech-to-Text Tool (Francisco's Project)
 
 ## Project info
 
@@ -6,7 +6,7 @@
 
 ## How can I edit this code?
 
-There are several ways of editing your application.
+There are a few ways of editing your application.
 
 **Use Lovable**
 
